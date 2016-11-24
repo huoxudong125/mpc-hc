@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -22,6 +22,9 @@
 #pragma once
 
 #include <afxcview.h>
+#include <vector>
+#include <map>
+#include "EventDispatcher.h"
 #include "PlayerBar.h"
 #include "PlayerListCtrl.h"
 #include "../Subtitles/RTS.h"
@@ -40,7 +43,14 @@ private:
 
     CPlayerListCtrl m_list;
 
+    CMainFrame* m_pMainFrame;
+
     CFont m_font;
+    void ScaleFont();
+
+    int m_itemHeight = 0;
+    EventClient m_eventc;
+    void EventCallback(MpcEvent ev);
 
     CCritSec* m_pSubLock;
     CComPtr<ISubStream> m_pSubStream;
@@ -78,12 +88,12 @@ private:
     };
     MODE m_mode;
 
-    //bool m_bUnlink;
-
+    std::multimap<int, size_t> m_newStartsIndex;
     struct SubTime {
         int orgStart, newStart, orgEnd, newEnd;
+        std::multimap<int, size_t>::iterator itIndex;
     };
-    CAtlArray<SubTime> m_subtimes;
+    std::vector<SubTime> m_subtimes;
 
     CSimpleTextSubtitle m_sts;
     CAtlArray<CVobSubFile::SubPos> m_vobSub;
@@ -92,7 +102,7 @@ private:
         int tStart, tPrevStart, tEnd, tPrevEnd;
         int flags;
     };
-    CAtlArray<DisplayData> m_displayData;
+    std::vector<DisplayData> m_displayData;
     CString m_displayBuffer;
 
     int GetStartTime(int iItem);
@@ -121,7 +131,7 @@ private:
     void OnGetDisplayInfoVobSub(LV_ITEM* pItem);
 
 public:
-    CPlayerSubresyncBar();
+    CPlayerSubresyncBar(CMainFrame* pMainFrame);
     virtual ~CPlayerSubresyncBar();
 
     BOOL Create(CWnd* pParentWnd, UINT defDockBarID, CCritSec* pSubLock);
@@ -148,6 +158,7 @@ protected:
 
     DECLARE_MESSAGE_MAP()
 
+    void OnMeasureItem(int nIDCtl, LPMEASUREITEMSTRUCT lpMeasureItemStruct);
     afx_msg void OnSize(UINT nType, int cx, int cy);
     afx_msg void OnGetDisplayInfo(NMHDR* pNMHDR, LRESULT* pResult);
     afx_msg void OnBeginlabeleditList(NMHDR* pNMHDR, LRESULT* pResult);

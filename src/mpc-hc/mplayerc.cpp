@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -33,10 +33,11 @@
 #include "Ifo.h"
 #include "Monitors.h"
 #include "WinAPIUtils.h"
+#include "PathUtils.h"
 #include "FileAssoc.h"
 #include "UpdateChecker.h"
 #include "winddk/ntddcdvd.h"
-#include "mhook/mhook-lib/mhook.h"
+#include "MhookHelper.h"
 #include <afxsock.h>
 #include <atlsync.h>
 #include <atlutil.h>
@@ -45,11 +46,12 @@
 #include "mpc-hc_config.h"
 #include "../MathLibFix/MathLibFix.h"
 #include "CmdLineHelpDlg.h"
+#include "CrashReporter.h"
 
 
 #define HOOKS_BUGS_URL _T("https://trac.mpc-hc.org/ticket/3739")
 
-HICON LoadIcon(CString fn, bool bSmallIcon)
+HICON LoadIcon(CString fn, bool bSmallIcon, DpiHelper* pDpiHelper/* = nullptr*/)
 {
     if (fn.IsEmpty()) {
         return nullptr;
@@ -62,6 +64,11 @@ HICON LoadIcon(CString fn, bool bSmallIcon)
 
     CSize size(bSmallIcon ? GetSystemMetrics(SM_CXSMICON) : GetSystemMetrics(SM_CXICON),
                bSmallIcon ? GetSystemMetrics(SM_CYSMICON) : GetSystemMetrics(SM_CYICON));
+
+    if (pDpiHelper) {
+        size.cx = pDpiHelper->ScaleSystemToOverrideX(size.cx);
+        size.cy = pDpiHelper->ScaleSystemToOverrideY(size.cy);
+    }
 
     typedef HRESULT(WINAPI * LIWSD)(HINSTANCE, PCWSTR, int, int, HICON*);
     auto loadIcon = [&size](PCWSTR pszName) {
@@ -83,6 +90,12 @@ HICON LoadIcon(CString fn, bool bSmallIcon)
 
     if (!ext.CompareNoCase(_T(".cda"))) {
         if (HICON hIcon = loadIcon(MAKEINTRESOURCE(IDI_AUDIOCD))) {
+            return hIcon;
+        }
+    }
+
+    if (!ext.CompareNoCase(_T(".unknown"))) {
+        if (HICON hIcon = loadIcon(MAKEINTRESOURCE(IDI_UNKNOWN))) {
             return hIcon;
         }
     }
@@ -277,7 +290,7 @@ static bool FindRedir(const CString& fn, CString ct, CAtlList<CString>& fns, con
         }
     }
 
-    CString dir = fn.Left(max(fn.ReverseFind('/'), fn.ReverseFind('\\')) + 1); // "ReverseFindOneOf"
+    CString dir = fn.Left(std::max(fn.ReverseFind('/'), fn.ReverseFind('\\')) + 1); // "ReverseFindOneOf"
 
     for (const auto re : res) {
         std::wcmatch mc;
@@ -576,12 +589,11 @@ void SetAudioRenderer(int AudioDevNo)
     int i = 2;
 
     BeginEnumSysDev(CLSID_AudioRendererCategory, pMoniker) {
-        LPOLESTR olestr = nullptr;
+        CComHeapPtr<OLECHAR> olestr;
         if (FAILED(pMoniker->GetDisplayName(0, 0, &olestr))) {
             continue;
         }
         CStringW str(olestr);
-        CoTaskMemFree(olestr);
         m_AudioRendererDisplayNames.Add(CString(str));
         i++;
     }
@@ -589,7 +601,7 @@ void SetAudioRenderer(int AudioDevNo)
 
     m_AudioRendererDisplayNames.Add(AUDRNDT_NULL_COMP);
     m_AudioRendererDisplayNames.Add(AUDRNDT_NULL_UNCOMP);
-    m_AudioRendererDisplayNames.Add(AUDRNDT_MPC);
+    m_AudioRendererDisplayNames.Add(AUDRNDT_INTERNAL);
     i += 3;
     if (AudioDevNo >= 1 && AudioDevNo <= i) {
         AfxGetMyApp()->m_AudioRendererDisplayName_CL = m_AudioRendererDisplayNames[AudioDevNo - 1];
@@ -605,16 +617,13 @@ void SetHandCursor(HWND m_hWnd, UINT nID)
 
 CMPlayerCApp::CMPlayerCApp()
     : m_hNTDLL(nullptr)
-    , m_fClosingState(false)
+    , m_bDelayingIdle(false)
     , m_bProfileInitialized(false)
     , m_bQueuedProfileFlush(false)
     , m_dwProfileLastAccessTick(0)
-    , m_bDelayingIdle(false)
+    , m_fClosingState(false)
 {
-    TCHAR strApp[MAX_PATH];
-
-    GetModuleFileNameEx(GetCurrentProcess(), m_hInstance, strApp, MAX_PATH);
-    m_strVersion = FileVersionInfo::GetFileVersionStr(strApp);
+    m_strVersion = FileVersionInfo::GetFileVersionStr(PathUtils::GetProgramPath(true));
 
     ZeroMemory(&m_ColorControl, sizeof(m_ColorControl));
     ResetColorControlRange();
@@ -639,6 +648,8 @@ CMPlayerCApp::~CMPlayerCApp()
     if (m_hNTDLL) {
         FreeLibrary(m_hNTDLL);
     }
+    // Wait for any pending I/O operations to be canceled
+    while (WAIT_IO_COMPLETION == SleepEx(0, TRUE));
 }
 
 void CMPlayerCApp::DelayedIdle()
@@ -730,20 +741,20 @@ bool CMPlayerCApp::StoreSettingsToRegistry()
 
 CString CMPlayerCApp::GetIniPath() const
 {
-    CString path = GetProgramPath(true);
+    CString path = PathUtils::GetProgramPath(true);
     path = path.Left(path.ReverseFind('.') + 1) + _T("ini");
     return path;
 }
 
 bool CMPlayerCApp::IsIniValid() const
 {
-    return FileExists(GetIniPath());
+    return PathUtils::Exists(GetIniPath());
 }
 
 bool CMPlayerCApp::GetAppSavePath(CString& path)
 {
     if (IsIniValid()) { // If settings ini file found, store stuff in the same folder as the exe file
-        path = GetProgramPath();
+        path = PathUtils::GetProgramPath();
     } else {
         return GetAppDataPath(path);
     }
@@ -848,7 +859,7 @@ void CMPlayerCApp::InitProfile()
         m_dwProfileLastAccessTick = GetTickCount();
 
         ASSERT(m_pszProfileName);
-        if (!FileExists(m_pszProfileName)) {
+        if (!PathUtils::Exists(m_pszProfileName)) {
             return;
         }
 
@@ -1018,7 +1029,7 @@ BOOL CMPlayerCApp::GetProfileBinary(LPCTSTR lpszSection, LPCTSTR lpszEntry, LPBY
             return FALSE;
         }
         for (UINT i = 0; i < *pBytes; i++) {
-            (*ppData)[i] = (valueStr[i * 2] - 'A') | ((valueStr[i * 2 + 1] - 'A') << 4);
+            (*ppData)[i] = BYTE((valueStr[i * 2] - 'A') | ((valueStr[i * 2 + 1] - 'A') << 4));
         }
         return TRUE;
     }
@@ -1447,6 +1458,10 @@ BOOL CMPlayerCApp::InitInstance()
     // Remove the working directory from the search path to work around the DLL preloading vulnerability
     SetDllDirectory(_T(""));
 
+    // At this point we have not hooked this function yet so we get the real result
+    if (!IsDebuggerPresent()) {
+        CrashReporter::Enable();
+    }
     WorkAroundMathLibraryBug();
 
     if (!HeapSetInformation(nullptr, HeapEnableTerminationOnCorruption, nullptr, 0)) {
@@ -1457,7 +1472,7 @@ BOOL CMPlayerCApp::InitInstance()
     // At this point only main thread should be present, mhook is custom-hacked accordingly
     bool bHookingSuccessful = true;
 
-    bHookingSuccessful &= !!Mhook_SetHook(&(PVOID&)Real_IsDebuggerPresent, (PVOID)Mine_IsDebuggerPresent);
+    bHookingSuccessful &= !!Mhook_SetHookEx(&Real_IsDebuggerPresent, Mine_IsDebuggerPresent);
 
     m_hNTDLL = LoadLibrary(_T("ntdll.dll"));
 #ifndef _DEBUG  // Disable NtQueryInformationProcess in debug (prevent VS debugger to stop on crash address)
@@ -1465,13 +1480,13 @@ BOOL CMPlayerCApp::InitInstance()
         Real_NtQueryInformationProcess = (decltype(Real_NtQueryInformationProcess))GetProcAddress(m_hNTDLL, "NtQueryInformationProcess");
 
         if (Real_NtQueryInformationProcess) {
-            bHookingSuccessful &= !!Mhook_SetHook(&(PVOID&)Real_NtQueryInformationProcess, (PVOID)Mine_NtQueryInformationProcess);
+            bHookingSuccessful &= !!Mhook_SetHookEx(&Real_NtQueryInformationProcess, Mine_NtQueryInformationProcess);
         }
     }
 #endif
 
-    bHookingSuccessful &= !!Mhook_SetHook(&(PVOID&)Real_CreateFileW, (PVOID)Mine_CreateFileW);
-    bHookingSuccessful &= !!Mhook_SetHook(&(PVOID&)Real_DeviceIoControl, (PVOID)Mine_DeviceIoControl);
+    bHookingSuccessful &= !!Mhook_SetHookEx(&Real_CreateFileW, Mine_CreateFileW);
+    bHookingSuccessful &= !!Mhook_SetHookEx(&Real_DeviceIoControl, Mine_DeviceIoControl);
 
     if (!bHookingSuccessful) {
         if (AfxMessageBox(IDS_HOOKS_FAILED, MB_ICONWARNING | MB_YESNO, 0) == IDYES) {
@@ -1480,11 +1495,11 @@ BOOL CMPlayerCApp::InitInstance()
     }
 
     // If those hooks fail it's annoying but try to run anyway without reporting any error in release mode
-    VERIFY(Mhook_SetHook(&(PVOID&)Real_ChangeDisplaySettingsExA, (PVOID)Mine_ChangeDisplaySettingsExA));
-    VERIFY(Mhook_SetHook(&(PVOID&)Real_ChangeDisplaySettingsExW, (PVOID)Mine_ChangeDisplaySettingsExW));
-    VERIFY(Mhook_SetHook(&(PVOID&)Real_CreateFileA, (PVOID)Mine_CreateFileA)); // The internal splitter uses the right share mode anyway so this is no big deal
-    VERIFY(Mhook_SetHook(&(PVOID&)Real_LockWindowUpdate, (PVOID)Mine_LockWindowUpdate));
-    VERIFY(Mhook_SetHook(&(PVOID&)Real_mixerSetControlDetails, (PVOID)Mine_mixerSetControlDetails));
+    VERIFY(Mhook_SetHookEx(&Real_ChangeDisplaySettingsExA, Mine_ChangeDisplaySettingsExA));
+    VERIFY(Mhook_SetHookEx(&Real_ChangeDisplaySettingsExW, Mine_ChangeDisplaySettingsExW));
+    VERIFY(Mhook_SetHookEx(&Real_CreateFileA, Mine_CreateFileA)); // The internal splitter uses the right share mode anyway so this is no big deal
+    VERIFY(Mhook_SetHookEx(&Real_LockWindowUpdate, Mine_LockWindowUpdate));
+    VERIFY(Mhook_SetHookEx(&Real_mixerSetControlDetails, Mine_mixerSetControlDetails));
 
     CFilterMapper2::Init();
 
@@ -1530,7 +1545,7 @@ BOOL CMPlayerCApp::InitInstance()
 
     m_s->ParseCommandLine(m_cmdln);
 
-    VERIFY(SetCurrentDirectory(GetProgramPath()));
+    VERIFY(SetCurrentDirectory(PathUtils::GetProgramPath()));
 
     if (m_s->nCLSwitches & (CLSW_HELP | CLSW_UNRECOGNIZEDSWITCH)) { // show commandline help window
         m_s->LoadSettings();
@@ -1579,7 +1594,7 @@ BOOL CMPlayerCApp::InitInstance()
             VERIFY(key.Close() == ERROR_SUCCESS);
             // Set ExePath value to prevent settings migration
             key.Attach(GetAppRegistryKey());
-            VERIFY(key.SetStringValue(_T("ExePath"), GetProgramPath(true)) == ERROR_SUCCESS);
+            VERIFY(key.SetStringValue(_T("ExePath"), PathUtils::GetProgramPath(true)) == ERROR_SUCCESS);
             VERIFY(key.Close() == ERROR_SUCCESS);
         }
 
@@ -1589,7 +1604,7 @@ BOOL CMPlayerCApp::InitInstance()
             CPath playlistPath;
             playlistPath.Combine(strSavePath, _T("default.mpcpl"));
 
-            if (FileExists(playlistPath)) {
+            if (playlistPath.FileExists()) {
                 CFile::Remove(playlistPath);
             }
         }
@@ -1715,7 +1730,7 @@ BOOL CMPlayerCApp::InitInstance()
                 }
             }
 
-            key.SetStringValue(_T("ExePath"), GetProgramPath(true));
+            key.SetStringValue(_T("ExePath"), PathUtils::GetProgramPath(true));
         }
     }
 
@@ -1734,7 +1749,9 @@ BOOL CMPlayerCApp::InitInstance()
     CMainFrame* pFrame = DEBUG_NEW CMainFrame;
     m_pMainWnd = pFrame;
     if (!pFrame->LoadFrame(IDR_MAINFRAME, WS_OVERLAPPEDWINDOW | FWS_ADDTOTITLE, nullptr, nullptr)) {
-        AfxMessageBox(_T("CMainFrame::LoadFrame failed!"));
+        if (MessageBox(nullptr, ResStr(IDS_FRAME_INIT_FAILED), m_pszAppName, MB_ICONERROR | MB_YESNO) == IDYES) {
+            ShellExecute(nullptr, _T("open"), TRAC_URL, nullptr, nullptr, SW_SHOWDEFAULT);
+        }
         return FALSE;
     }
     pFrame->m_controls.LoadState();
@@ -1745,9 +1762,30 @@ BOOL CMPlayerCApp::InitInstance()
     pFrame->SetDefaultFullscreenState();
     pFrame->UpdateControlState(CMainFrame::UPDATE_CONTROLS_VISIBILITY);
     pFrame->SetIcon(icon, TRUE);
-    pFrame->DragAcceptFiles();
-    pFrame->ShowWindow((m_s->nCLSwitches & CLSW_MINIMIZED) ? SW_SHOWMINIMIZED : SW_SHOW);
+
+    bool bRestoreLastWindowType = m_s->fRememberWindowSize && m_s->fRememberWindowPos;
+    bool bMinimized = (m_s->nCLSwitches & CLSW_MINIMIZED) || (bRestoreLastWindowType && m_s->nLastWindowType == SIZE_MINIMIZED);
+    bool bMaximized = bRestoreLastWindowType && m_s->nLastWindowType == SIZE_MAXIMIZED;
+
+    if (bMinimized) {
+        m_nCmdShow = (m_s->nCLSwitches & CLSW_NOFOCUS) ? SW_SHOWMINNOACTIVE : SW_SHOWMINIMIZED;
+    } else if (bMaximized) {
+        // Show maximized without focus is not supported nor make sense.
+        m_nCmdShow = (m_s->nCLSwitches & CLSW_NOFOCUS) ? SW_SHOWNOACTIVATE : SW_SHOWMAXIMIZED;
+    } else {
+        m_nCmdShow = (m_s->nCLSwitches & CLSW_NOFOCUS) ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL;
+    }
+
+    pFrame->ActivateFrame(m_nCmdShow);
     pFrame->UpdateWindow();
+
+    if (bMinimized && bMaximized) {
+        WINDOWPLACEMENT wp;
+        GetWindowPlacement(*pFrame, &wp);
+        wp.flags = WPF_RESTORETOMAXIMIZED;
+        SetWindowPlacement(*pFrame, &wp);
+    }
+
     pFrame->m_hAccelTable = m_s->hAccel;
     m_s->WinLircClient.SetHWND(m_pMainWnd->m_hWnd);
     if (m_s->fWinLirc) {
@@ -1764,8 +1802,6 @@ BOOL CMPlayerCApp::InitInstance()
 
     SendCommandLine(m_pMainWnd->m_hWnd);
     RegisterHotkeys();
-
-    pFrame->SetFocus();
 
     // set HIGH I/O Priority for better playback performance
     if (m_hNTDLL) {
@@ -2129,10 +2165,8 @@ void CRemoteCtrlClient::ExecuteCommand(CStringA cmd, int repcnt)
     POSITION pos = s.wmcmds.GetHeadPosition();
     while (pos) {
         wmcmd wc = s.wmcmds.GetNext(pos);
-        CStringA name = TToA(wc.GetName());
-        name.Replace(' ', '_');
         if ((repcnt == 0 && wc.rmrepcnt == 0 || wc.rmrepcnt > 0 && (repcnt % wc.rmrepcnt) == 0)
-                && (!name.CompareNoCase(cmd) || !wc.rmcmd.CompareNoCase(cmd) || wc.cmd == (WORD)strtol(cmd, nullptr, 10))) {
+                && (!wc.rmcmd.CompareNoCase(cmd) || wc.cmd == (WORD)strtol(cmd, nullptr, 10))) {
             CAutoLock cAutoLock(&m_csLock);
             TRACE(_T("CRemoteCtrlClient (calling command): %s\n"), wc.GetName());
             m_pWnd->SendMessage(WM_COMMAND, wc.cmd);
@@ -2234,28 +2268,28 @@ void CMPlayerCApp::UpdateColorControlRange(bool isEVR)
         m_ColorControl[0].MinValue      = FixedToInt(m_EVRColorControl[0].MinValue);
         m_ColorControl[0].MaxValue      = FixedToInt(m_EVRColorControl[0].MaxValue);
         m_ColorControl[0].DefaultValue  = FixedToInt(m_EVRColorControl[0].DefaultValue);
-        m_ColorControl[0].StepSize      = max(1, FixedToInt(m_EVRColorControl[0].StepSize));
+        m_ColorControl[0].StepSize      = std::max(1, FixedToInt(m_EVRColorControl[0].StepSize));
         // Contrast
         m_ColorControl[1].MinValue      = FixedToInt(m_EVRColorControl[1].MinValue, 100) - 100;
         m_ColorControl[1].MaxValue      = FixedToInt(m_EVRColorControl[1].MaxValue, 100) - 100;
         m_ColorControl[1].DefaultValue  = FixedToInt(m_EVRColorControl[1].DefaultValue, 100) - 100;
-        m_ColorControl[1].StepSize      = max(1, FixedToInt(m_EVRColorControl[1].StepSize, 100));
+        m_ColorControl[1].StepSize      = std::max(1, FixedToInt(m_EVRColorControl[1].StepSize, 100));
         // Hue
         m_ColorControl[2].MinValue      = FixedToInt(m_EVRColorControl[2].MinValue);
         m_ColorControl[2].MaxValue      = FixedToInt(m_EVRColorControl[2].MaxValue);
         m_ColorControl[2].DefaultValue  = FixedToInt(m_EVRColorControl[2].DefaultValue);
-        m_ColorControl[2].StepSize      = max(1, FixedToInt(m_EVRColorControl[2].StepSize));
+        m_ColorControl[2].StepSize      = std::max(1, FixedToInt(m_EVRColorControl[2].StepSize));
         // Saturation
         m_ColorControl[3].MinValue      = FixedToInt(m_EVRColorControl[3].MinValue, 100) - 100;
         m_ColorControl[3].MaxValue      = FixedToInt(m_EVRColorControl[3].MaxValue, 100) - 100;
         m_ColorControl[3].DefaultValue  = FixedToInt(m_EVRColorControl[3].DefaultValue, 100) - 100;
-        m_ColorControl[3].StepSize      = max(1, FixedToInt(m_EVRColorControl[3].StepSize, 100));
+        m_ColorControl[3].StepSize      = std::max(1, FixedToInt(m_EVRColorControl[3].StepSize, 100));
     } else {
         // Brightness
         m_ColorControl[0].MinValue      = (int)floor(m_VMR9ColorControl[0].MinValue + 0.5);
         m_ColorControl[0].MaxValue      = (int)floor(m_VMR9ColorControl[0].MaxValue + 0.5);
         m_ColorControl[0].DefaultValue  = (int)floor(m_VMR9ColorControl[0].DefaultValue + 0.5);
-        m_ColorControl[0].StepSize      = max(1, (int)(m_VMR9ColorControl[0].StepSize + 0.5));
+        m_ColorControl[0].StepSize      = std::max(1, (int)(m_VMR9ColorControl[0].StepSize + 0.5));
         // Contrast
         /*if (m_VMR9ColorControl[1].MinValue == 0.0999908447265625) {
               m_VMR9ColorControl[1].MinValue = 0.11;    //fix NVIDIA bug
@@ -2266,17 +2300,17 @@ void CMPlayerCApp::UpdateColorControlRange(bool isEVR)
         m_ColorControl[1].MinValue      = (int)floor(m_VMR9ColorControl[1].MinValue * 100 + 0.5) - 100;
         m_ColorControl[1].MaxValue      = (int)floor(m_VMR9ColorControl[1].MaxValue * 100 + 0.5) - 100;
         m_ColorControl[1].DefaultValue  = (int)floor(m_VMR9ColorControl[1].DefaultValue * 100 + 0.5) - 100;
-        m_ColorControl[1].StepSize      = max(1, (int)(m_VMR9ColorControl[1].StepSize * 100 + 0.5));
+        m_ColorControl[1].StepSize      = std::max(1, (int)(m_VMR9ColorControl[1].StepSize * 100 + 0.5));
         // Hue
         m_ColorControl[2].MinValue      = (int)floor(m_VMR9ColorControl[2].MinValue + 0.5);
         m_ColorControl[2].MaxValue      = (int)floor(m_VMR9ColorControl[2].MaxValue + 0.5);
         m_ColorControl[2].DefaultValue  = (int)floor(m_VMR9ColorControl[2].DefaultValue + 0.5);
-        m_ColorControl[2].StepSize      = max(1, (int)(m_VMR9ColorControl[2].StepSize + 0.5));
+        m_ColorControl[2].StepSize      = std::max(1, (int)(m_VMR9ColorControl[2].StepSize + 0.5));
         // Saturation
         m_ColorControl[3].MinValue      = (int)floor(m_VMR9ColorControl[3].MinValue * 100 + 0.5) - 100;
         m_ColorControl[3].MaxValue      = (int)floor(m_VMR9ColorControl[3].MaxValue * 100 + 0.5) - 100;
         m_ColorControl[3].DefaultValue  = (int)floor(m_VMR9ColorControl[3].DefaultValue * 100 + 0.5) - 100;
-        m_ColorControl[3].StepSize      = max(1, (int)(m_VMR9ColorControl[3].StepSize * 100 + 0.5));
+        m_ColorControl[3].StepSize      = std::max(1, (int)(m_VMR9ColorControl[3].StepSize * 100 + 0.5));
     }
 
     // Brightness

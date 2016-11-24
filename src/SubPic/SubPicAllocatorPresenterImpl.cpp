@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -34,17 +34,17 @@
 CSubPicAllocatorPresenterImpl::CSubPicAllocatorPresenterImpl(HWND hWnd, HRESULT& hr, CString* _pError)
     : CUnknown(NAME("CSubPicAllocatorPresenterImpl"), nullptr)
     , m_hWnd(hWnd)
+    , m_rtSubtitleDelay(0)
     , m_maxSubtitleTextureSize(0, 0)
     , m_nativeVideoSize(0, 0)
     , m_aspectRatio(0, 0)
     , m_videoRect(0, 0, 0, 0)
     , m_windowRect(0, 0, 0, 0)
+    , m_rtNow(0)
     , m_fps(25.0)
     , m_refreshRate(0)
-    , m_rtSubtitleDelay(0)
     , m_bDeviceResetRequested(false)
     , m_bPendingResetDevice(false)
-    , m_rtNow(0)
     , m_SubtitleTextureLimit(STATIC)
 {
     if (!IsWindow(m_hWnd)) {
@@ -70,6 +70,7 @@ STDMETHODIMP CSubPicAllocatorPresenterImpl::NonDelegatingQueryInterface(REFIID r
         QI(ISubPicAllocatorPresenter2)
         QI(ISubRenderOptions)
         QI(ISubRenderConsumer)
+        QI(ISubRenderConsumer2)
         __super::NonDelegatingQueryInterface(riid, ppv);
 }
 
@@ -116,12 +117,15 @@ void CSubPicAllocatorPresenterImpl::InitMaxSubtitleTextureSize(int maxSize, CSiz
     }
 }
 
-void CSubPicAllocatorPresenterImpl::AlphaBltSubPic(const CRect& windowRect, const CRect& videoRect, SubPicDesc* pTarget)
+void CSubPicAllocatorPresenterImpl::AlphaBltSubPic(const CRect& windowRect,
+                                                   const CRect& videoRect,
+                                                   SubPicDesc* pTarget /*= nullptr*/,
+                                                   const double videoStretchFactor /*= 1.0*/)
 {
     CComPtr<ISubPic> pSubPic;
     if (m_pSubPicQueue->LookupSubPic(m_rtNow, !IsRendering(), pSubPic)) {
         CRect rcSource, rcDest;
-        if (SUCCEEDED(pSubPic->GetSourceAndDest(windowRect, videoRect, rcSource, rcDest))) {
+        if (SUCCEEDED(pSubPic->GetSourceAndDest(windowRect, videoRect, rcSource, rcDest, videoStretchFactor))) {
             pSubPic->AlphaBlt(rcSource, rcDest, pTarget);
         }
     }
@@ -167,9 +171,12 @@ STDMETHODIMP_(void) CSubPicAllocatorPresenterImpl::SetPosition(RECT w, RECT v)
 
     m_windowRect = w;
 
-    bool bVideoRectChanged = !!(m_videoRect != v);
+    CRect videoRect(v);
+    videoRect.OffsetRect(-m_windowRect.TopLeft());
 
-    m_videoRect = v;
+    bool bVideoRectChanged = !!(m_videoRect != videoRect);
+
+    m_videoRect = videoRect;
 
     if (bWindowSizeChanged || bVideoRectChanged) {
         if (m_pAllocator) {
@@ -183,7 +190,7 @@ STDMETHODIMP_(void) CSubPicAllocatorPresenterImpl::SetPosition(RECT w, RECT v)
     }
 
     if (bWindowPosChanged || bVideoRectChanged) {
-        Paint(bWindowSizeChanged || bVideoRectChanged);
+        Paint(false);
     }
 }
 
@@ -264,7 +271,7 @@ STDMETHODIMP CSubPicAllocatorPresenterImpl::SetVideoAngle(Vector v)
     XForm xform(Ray(Vector(), v), Vector(1, 1, 1), false);
     if (m_xform != xform) {
         m_xform = xform;
-        Paint(true);
+        Paint(false);
         return S_OK;
     }
     return S_FALSE;
@@ -483,10 +490,21 @@ STDMETHODIMP CSubPicAllocatorPresenterImpl::Connect(ISubRenderProvider* subtitle
                                              : (ISubPicQueue*)DEBUG_NEW CXySubPicQueueNoThread(m_pAllocator, &hr);
         */
 
+        // Lock and wait for m_pAllocator to be ready.
+        CAutoLock cAutoLock(this);
+        if (!m_pAllocator) {
+            std::mutex mutexAllocator;
+            std::unique_lock<std::mutex> lock(mutexAllocator);
+            if (!m_condAllocatorReady.wait_for(lock, std::chrono::seconds(1), [&]() {return !!m_pAllocator;})) {
+                // Return early, CXySubPicQueueNoThread ctor would fail anyway.
+                ASSERT(FALSE);
+                return E_FAIL;
+            }
+        }
+
         CComPtr<ISubPicQueue> pSubPicQueue = (ISubPicQueue*)DEBUG_NEW CXySubPicQueueNoThread(m_pAllocator, &hr);
 
         if (SUCCEEDED(hr)) {
-            CAutoLock(this);
             pSubPicQueue->SetSubPicProvider(pSubPicProvider);
             m_pSubPicProvider = pSubPicProvider;
             m_pSubPicQueue = pSubPicQueue;

@@ -2,16 +2,17 @@
 # Copyright (C) 2002 - 2013 see Authors.txt
 # This file is distributed under the same license as the MPC-HC package.
 # Translators:
-# mehzad, 2014
+# Mehedi Hussain, 2014
+# Mehedi Hussain, 2014
 # mehzad, 2014
 # Tapu Afrad (তপু আফ্রাদ) <tapu_afrad@hotmail.com>, 2014
 msgid ""
 msgstr ""
 "Project-Id-Version: MPC-HC\n"
-"POT-Creation-Date: 2014-09-19 20:08:04+0000\n"
-"PO-Revision-Date: 2014-09-20 10:30+0000\n"
-"Last-Translator: JellyFrog\n"
-"Language-Team: Bengali (http://www.transifex.com/projects/p/mpc-hc/language/bn/)\n"
+"POT-Creation-Date: 2015-08-06 16:05:43+0000\n"
+"PO-Revision-Date: 2015-08-06 16:46+0000\n"
+"Last-Translator: Underground78\n"
+"Language-Team: Bengali (http://www.transifex.com/mpc-hc/mpc-hc/language/bn/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -108,10 +109,10 @@ msgstr "অডিও সময়ের স্থানান্তর (ms):"
 
 msgctxt "IDD_PPAGEAUDIOSWITCHER_IDC_CHECK1"
 msgid "Enable custom channel mapping"
-msgstr "নির্ধারণযোগ্য চ্যানেল বিন্যাস সক্রিয়করণ"
+msgstr "ব্যক্তি-নির্ধারিত চ্যানেল বিন্যাস সক্রিয়করণ"
 
 msgctxt "IDD_PPAGEAUDIOSWITCHER_IDC_STATIC1"
-msgid "Speaker configuration for "
+msgid "Speaker configuration for"
 msgstr "কনফিগারেশনের জন্য স্পিকার সংখ্যা"
 
 msgctxt "IDD_PPAGEAUDIOSWITCHER_IDC_STATIC2"
@@ -119,7 +120,7 @@ msgid "input channels:"
 msgstr "ইনপুট চ্যানেলসমূহ:"
 
 msgctxt "IDD_PPAGEAUDIOSWITCHER_IDC_STATIC3"
-msgid "Hold shift for immediate changes when clicking something "
+msgid "Hold shift for immediate changes when clicking something"
 msgstr "কোন কিছু ক্লিক করার সময় অবিলম্বে পরিবর্তনের জন্য শিফট কী ধরে রাখুন"
 
 msgctxt "IDD_GOTO_DLG_CAPTION"
@@ -191,8 +192,8 @@ msgid "About"
 msgstr "MPC-HC বিষয়ক"
 
 msgctxt "IDD_ABOUTBOX_IDC_AUTHORS_LINK"
-msgid "Copyright © 2002-2014 see Authors.txt"
-msgstr "কপিরাইট © ২০০২-২০১৪ বিস্তারিত দেখুন Authors.txtএ"
+msgid "Copyright © 2002-2015 see Authors.txt"
+msgstr "কপিরাইট © ২০০২-২০১৫ বিস্তারিত দেখুন Authors.txtএ"
 
 msgctxt "IDD_ABOUTBOX_IDC_STATIC"
 msgid "This program is freeware and released under the GNU General Public License."
@@ -200,7 +201,7 @@ msgstr "এই প্রোগ্রামটি একটি উন্মুক
 
 msgctxt "IDD_ABOUTBOX_IDC_STATIC"
 msgid "English translation made by MPC-HC Team"
-msgstr "বাংলা অনুবাদ সম্পাদিত করেছে মেহেদী শান্ত"
+msgstr "বাংলা অনুবাদটি সম্পাদনা করেছে মেহেদী শান্ত"
 
 msgctxt "IDD_ABOUTBOX_IDC_STATIC"
 msgid "Build information"
@@ -474,10 +475,6 @@ msgctxt "IDD_PPAGEPLAYBACK_IDC_CHECK2"
 msgid "Auto-load audio files"
 msgstr "স্বয়ংক্রিয়ভাবে অডিও ফাইল লোড"
 
-msgctxt "IDD_PPAGEPLAYBACK_IDC_CHECK3"
-msgid "Use the built-in subtitle renderer"
-msgstr "বিল্ট-ইন সাবটাইটেল রেনডারার ব্যবহার"
-
 msgctxt "IDD_PPAGEPLAYBACK_IDC_STATIC"
 msgid "Control"
 msgstr "কন্ট্রোল"
@@ -516,7 +513,7 @@ msgstr "%"
 
 msgctxt "IDD_PPAGESUBTITLES_IDC_STATIC"
 msgid "Delay step"
-msgstr ""
+msgstr "বিলম্বনে পদক্ষেপ"
 
 msgctxt "IDD_PPAGESUBTITLES_IDC_STATIC"
 msgid "ms"
@@ -564,14 +561,14 @@ msgstr "রেনডারারের ধরন-প্রকৃতি"
 
 msgctxt "IDD_PPAGESUBTITLES_IDC_CHECK_SUB_AR_COMPENSATION"
 msgid "Apply aspect ratio compensation for anamorphic videos"
-msgstr "আনামর্ফিক ভিডিওসমূহের জন্য অ্যাসপেক্ট রেশিও সামঞ্জস্য করা কার্যকর করণ"
+msgstr "আনামর্ফিক ভিডিওসমূহের জন্য অ্যাসপেক্ট রেশিও সামঞ্জস্য করা প্রয়োগ করণ"
 
 msgctxt "IDD_PPAGESUBTITLES_IDC_STATIC"
 msgid "Warning"
 msgstr "সতর্কীকরণ"
 
 msgctxt "IDD_PPAGESUBTITLES_IDC_STATIC"
-msgid "If you override and enable full-screen antialiasing somewhere at your videocard's settings, subtitles aren't going to look any better but it will surely eat your cpu."
+msgid "If you override and enable full-screen antialiasing somewhere at your videocard's settings, subtitles aren't going to look any better but it will surely eat your CPU."
 msgstr "আপনার ভিডিওকার্ডের সেটিংসমূহের কোথাও যদি সম্পূর্ণ-স্ক্রীন জুড়ে অ্যান্টিএলিয়েসিং- ওভাররাইড করণ এবং সক্রিয় থাকে, তবে সাবটাইটেল অপেক্ষাকৃত ভাল তো দেখাবেই না বরং সেটা আপনার CPUর কর্মদক্ষতা হ্রাস করবে।"
 
 msgctxt "IDD_PPAGEFORMATS_IDC_STATIC2"
@@ -588,19 +585,19 @@ msgstr "সেট করি"
 
 msgctxt "IDD_PPAGEFORMATS_IDC_STATIC3"
 msgid "Association"
-msgstr "সংশ্লিষ্টতা"
+msgstr "সম্পৃক্ততা"
 
 msgctxt "IDD_PPAGEFORMATS_IDC_CHECK8"
 msgid "Use the format-specific icons"
-msgstr ""
+msgstr "ধরন-সাপেক্ষে নির্দিষ্ট আইকন ব্যবহার করি"
 
 msgctxt "IDD_PPAGEFORMATS_IDC_BUTTON1"
 msgid "Run as &administrator"
-msgstr ""
+msgstr "অ্যাডমিনিস্ট্রেটর হিসেবে চালনা করি(&A)"
 
 msgctxt "IDD_PPAGEFORMATS_IDC_BUTTON7"
 msgid "Set as &default program"
-msgstr ""
+msgstr "ডিফল্ট প্রোগ্রাম হিসেবে নির্ধারণ করি(&D)"
 
 msgctxt "IDD_PPAGEFORMATS_IDC_STATIC"
 msgid "Real-Time Streaming Protocol handler (for rtsp://... URLs)"
@@ -678,16 +675,16 @@ msgctxt "IDD_PPAGETWEAKS_IDC_CHECK6"
 msgid "Prevent minimizing the player when in fullscreen on a non default monitor"
 msgstr "ডিফল্ট নয় এমন মনিটরে ফুলস্ক্রীন জুড়ে অবস্থানকালে প্লেয়ারের মিনিমাইজ করণ প্রতিরোধ "
 
-msgctxt "IDD_PPAGETWEAKS_IDC_CHECK_WIN7"
-msgid "Use Windows 7 Taskbar features"
-msgstr "Windows 7এর বৈশিষ্ট্যমূলক টাস্কবার ব্যবহার"
+msgctxt "IDD_PPAGETWEAKS_IDC_CHECK_ENHANCED_TASKBAR"
+msgid "Use enhanced taskbar features"
+msgstr ""
 
 msgctxt "IDD_PPAGETWEAKS_IDC_CHECK7"
-msgid "Open next/previous file in folder on \"Skip back/forward\" when there is only one item in playlist"
+msgid "Open previous/next file in folder on \"Skip back/forward\" when there is only one item in playlist"
 msgstr "প্লেলিস্টে মাত্র একটি ফাইল থাকলে \"পিছনে/সামনে যাই\" দ্বারা ফোল্ডারে থাকা পরবর্তী/পূর্ববর্তী ফাইল চালনা"
 
 msgctxt "IDD_PPAGETWEAKS_IDC_CHECK8"
-msgid "Use time tooltip:"
+msgid "Show time tooltip:"
 msgstr "সময় প্রদর্শনে টুলটিপ ব্যবহার:"
 
 msgctxt "IDD_PPAGETWEAKS_IDC_STATIC"
@@ -932,7 +929,7 @@ msgstr "ms"
 
 msgctxt "IDD_SAVESUBTITLESFILEDIALOGTEMPL_IDC_CHECK1"
 msgid "Save custom style"
-msgstr "নির্ধারণকৃত ধরনটি সেইভ করি"
+msgstr "ব্যক্তি-নির্ধারিত ধরনটি সেইভ করি"
 
 msgctxt "IDD_SAVETHUMBSDIALOGTEMPL_IDC_STATIC"
 msgid "JPEG quality:"
@@ -1171,8 +1168,8 @@ msgid "DXVA"
 msgstr "DXVA"
 
 msgctxt "IDD_PPAGEOUTPUT_IDC_STATIC"
-msgid "Subtitles *"
-msgstr "সাবটাইটেল *"
+msgid "Subtitles"
+msgstr ""
 
 msgctxt "IDD_PPAGEOUTPUT_IDC_STATIC"
 msgid "Screenshot"
@@ -1187,8 +1184,8 @@ msgid "Rotation"
 msgstr "ঘূর্ণন"
 
 msgctxt "IDD_PPAGEOUTPUT_IDC_STATIC"
-msgid "* External filters (such as VSFilter) can display subtitles on all renderers."
-msgstr "* বাহিরস্থ ফিল্টারসমূহ (যেমন VSFilter) সকল রেনডারেই সাবটাইটেল প্রদর্শন করতে পারে।"
+msgid "Subtitle Renderer"
+msgstr ""
 
 msgctxt "IDD_PPAGEWEBSERVER_IDC_CHECK1"
 msgid "Listen on port:"
@@ -1205,6 +1202,10 @@ msgstr "সঙ্কোচন সক্রিয়করণ"
 msgctxt "IDD_PPAGEWEBSERVER_IDC_CHECK5"
 msgid "Allow access from localhost only"
 msgstr "শুধুমাত্র স্থানীয়হোস্ট থেকে অ্যাকসেস সমর্থন"
+
+msgctxt "IDD_PPAGEWEBSERVER_IDC_CHECK6"
+msgid "Enable preview"
+msgstr ""
 
 msgctxt "IDD_PPAGEWEBSERVER_IDC_CHECK2"
 msgid "Print debug information"
@@ -1279,12 +1280,12 @@ msgid "Enable automatic update check"
 msgstr "স্বয়ংক্রিয়ভাবে হালনাগাদ অনুসন্ধান সক্রিয়করণ"
 
 msgctxt "IDD_PPAGEMISC_IDC_STATIC5"
-msgid "Delay between each check:"
-msgstr "প্রত্যেক অনুসন্ধান মধ্যবর্তি বিরতি:"
+msgid "Check every:"
+msgstr "অনুসন্ধান করা হবে:"
 
 msgctxt "IDD_PPAGEMISC_IDC_STATIC6"
 msgid "day(s)"
-msgstr "দিন"
+msgstr "দিন পরপর"
 
 msgctxt "IDD_PPAGEMISC_IDC_STATIC"
 msgid "Settings management"
@@ -1500,7 +1501,7 @@ msgstr "নিচে নামাই"
 
 msgctxt "IDD_PPAGEFULLSCREEN_IDC_CHECK3"
 msgid "Apply default monitor mode on fullscreen exit"
-msgstr "ফুলস্ক্রীন থেকে প্রস্থানে ডিফল্ট মনিটর মুড কার্যকরকরণ"
+msgstr "ফুলস্ক্রীন থেকে প্রস্থানে ডিফল্ট মনিটর মুড প্রয়োগ করণ"
 
 msgctxt "IDD_PPAGEFULLSCREEN_IDC_RESTORERESCHECK"
 msgid "Restore resolution on program exit"
@@ -1654,15 +1655,95 @@ msgctxt "IDD_PPAGEADVANCED_IDC_BUTTON1"
 msgid "Default"
 msgstr "ডিফল্ট"
 
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_STATIC"
+msgid "Device"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_CHECK1"
+msgid "Exclusive mode"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_CHECK2"
+msgid "Allow bitstreaming"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_STATIC"
+msgid "Options"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_CHECK3"
+msgid "Enable stereo crossfeed (for headphones)"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_BUTTON1"
+msgid "C. Moy"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_BUTTON2"
+msgid "J. Meier"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_STATIC1"
+msgid "Cut-off:"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_STATIC3"
+msgid "Level:"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_STATIC"
+msgid "Note"
+msgstr ""
+
+msgctxt "IDD_PPAGEAUDIORENDERER_IDC_STATIC"
+msgid "To minimize audio distortion, it is recommended to keep player volume at around 85% when playing loud lossy-encoded content."
+msgstr ""
+
 msgctxt "IDD_SAVEIMAGEDIALOGTEMPL_IDC_STATIC"
 msgid "JPEG quality:"
 msgstr "JPEGএর বৈশিষ্ট্যগুণ:"
 
 msgctxt "IDD_CMD_LINE_HELP_CAPTION"
 msgid "Command line help"
-msgstr ""
+msgstr "কমান্ড লাইনের সহায়িকা"
 
 msgctxt "IDD_CMD_LINE_HELP_IDOK"
 msgid "OK"
 msgstr "ঠিক আছে"
+
+msgctxt "IDD_CRASH_REPORTER_CAPTION"
+msgid "Crash reporter"
+msgstr "আকস্মিক বন্ধ হওয়ার প্রতিবেদন"
+
+msgctxt "IDD_CRASH_REPORTER_IDC_STATIC"
+msgid "We are sorry, it seems MPC-HC just crashed. :("
+msgstr ""
+
+msgctxt "IDD_CRASH_REPORTER_IDC_CHECK1"
+msgid "Send a bug report to help us diagnose and fix the problem."
+msgstr ""
+
+msgctxt "IDD_CRASH_REPORTER_IDC_STATIC1"
+msgid "Optional information"
+msgstr ""
+
+msgctxt "IDD_CRASH_REPORTER_IDC_STATIC2"
+msgid "Email:"
+msgstr "ইমেইল:"
+
+msgctxt "IDD_CRASH_REPORTER_IDC_STATIC3"
+msgid "Your email address is optional and will only be used if the developers need to contact you for more information."
+msgstr "আপনার ইমেইল ঠিকানা দেয়া বাধ্যতামূলক নয় এবং শুধুমাত্র ব্যবহার করা হবে যদি ডেভলপারদের আরো তথ্যাদির জন্য আপনার সাথে যোগাযোগের প্রয়োজন পরে।"
+
+msgctxt "IDD_CRASH_REPORTER_IDC_STATIC4"
+msgid "Problem description (use English only):"
+msgstr "সমস্যার বৃত্তান্ত (শুধুমাত্র ইংরেজি ভাষা ব্যবহার করুন):"
+
+msgctxt "IDD_CRASH_REPORTER_IDC_BUTTON1"
+msgid "Restart MPC-HC"
+msgstr ""
+
+msgctxt "IDD_CRASH_REPORTER_IDC_BUTTON2"
+msgid "Quit MPC-HC"
+msgstr ""
 

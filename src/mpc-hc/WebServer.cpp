@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -29,7 +29,7 @@
 #include "WebClientSocket.h"
 #include "WebServer.h"
 #include "VersionInfo.h"
-#include "WinAPIUtils.h"
+#include "PathUtils.h"
 
 
 CAtlStringMap<CWebServer::RequestHandler, CStringA> CWebServer::m_internalpages;
@@ -40,7 +40,7 @@ CWebServer::CWebServer(CMainFrame* pMainFrame, int nPort)
     : m_pMainFrame(pMainFrame)
     , m_nPort(nPort)
 {
-    m_webroot = CPath(GetProgramPath());
+    m_webroot = CPath(PathUtils::GetProgramPath());
     const CAppSettings& s = AfxGetAppSettings();
 
     CString WebRoot = s.strWebRoot;
@@ -664,14 +664,14 @@ bool CWebServer::CallCGI(CWebClientSocket* pClient, CStringA& hdr, CStringA& bod
                     envstr.GetLength() ? (LPVOID)(LPCSTR)envstr : nullptr,
                     dir, &siStartInfo, &piProcInfo)) {
             DWORD ThreadId;
-            CreateThread(nullptr, 0, KillCGI, (LPVOID)piProcInfo.hProcess, 0, &ThreadId);
+            VERIFY(CreateThread(nullptr, 0, KillCGI, (LPVOID)piProcInfo.hProcess, 0, &ThreadId));
 
             static const int BUFFSIZE = 1024;
             DWORD dwRead, dwWritten = 0;
 
             int i = 0, len = pClient->m_data.GetLength();
             for (; i < len; i += dwWritten) {
-                if (!WriteFile(hChildStdinWrDup, (LPCSTR)pClient->m_data + i, min(len - i, BUFFSIZE), &dwWritten, nullptr)) {
+                if (!WriteFile(hChildStdinWrDup, (LPCSTR)pClient->m_data + i, std::min(len - i, BUFFSIZE), &dwWritten, nullptr)) {
                     break;
                 }
             }

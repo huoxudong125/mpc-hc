@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -32,6 +32,7 @@
 #include "Shaders.h"
 #include "FileAssoc.h"
 #include "FakeFilterMapper2.h"
+#include "../thirdparty/sanear/sanear/src/Interfaces.h"
 
 #include <afxadv.h>
 #include <afxsock.h>
@@ -58,15 +59,18 @@ enum : UINT64 {
     CLSW_LOGOFF = CLSW_SHUTDOWN << 1,
     CLSW_LOCK = CLSW_LOGOFF << 1,
     CLSW_MONITOROFF = CLSW_LOCK << 1,
-    CLSW_AFTERPLAYBACK_MASK = CLSW_CLOSE | CLSW_STANDBY | CLSW_SHUTDOWN | CLSW_HIBERNATE | CLSW_LOGOFF | CLSW_LOCK | CLSW_MONITOROFF,
-    CLSW_FULLSCREEN = CLSW_MONITOROFF << 1,
+    CLSW_PLAYNEXT = CLSW_MONITOROFF << 1,
+    CLSW_DONOTHING = CLSW_PLAYNEXT << 1,
+    CLSW_AFTERPLAYBACK_MASK = CLSW_CLOSE | CLSW_STANDBY | CLSW_SHUTDOWN | CLSW_HIBERNATE | CLSW_LOGOFF | CLSW_LOCK | CLSW_MONITOROFF | CLSW_PLAYNEXT | CLSW_DONOTHING,
+    CLSW_FULLSCREEN = CLSW_DONOTHING << 1,
     CLSW_NEW = CLSW_FULLSCREEN << 1,
     CLSW_HELP = CLSW_NEW << 1,
     CLSW_DVD = CLSW_HELP << 1,
     CLSW_CD = CLSW_DVD << 1,
     CLSW_DEVICE = CLSW_CD << 1,
     CLSW_ADD = CLSW_DEVICE << 1,
-    CLSW_MINIMIZED = CLSW_ADD << 1,
+    CLSW_RANDOMIZE = CLSW_ADD << 1,
+    CLSW_MINIMIZED = CLSW_RANDOMIZE << 1,
     CLSW_REGEXTVID = CLSW_MINIMIZED << 1,
     CLSW_REGEXTAUD = CLSW_REGEXTVID << 1,
     CLSW_REGEXTPL = CLSW_REGEXTAUD << 1,
@@ -81,7 +85,7 @@ enum : UINT64 {
     CLSW_SLAVE = CLSW_ADMINOPTION << 1,
     CLSW_AUDIORENDERER = CLSW_SLAVE << 1,
     CLSW_RESET = CLSW_AUDIORENDERER << 1,
-    CLSW_UNRECOGNIZEDSWITCH = CLSW_RESET << 1, // 32
+    CLSW_UNRECOGNIZEDSWITCH = CLSW_RESET << 1 // 35
 };
 
 enum MpcCaptionState {
@@ -136,7 +140,7 @@ enum MCE_RAW_INPUT {
 
 #define AUDRNDT_NULL_COMP       _T("Null Audio Renderer (Any)")
 #define AUDRNDT_NULL_UNCOMP     _T("Null Audio Renderer (Uncompressed)")
-#define AUDRNDT_MPC             _T("MPC-HC Audio Renderer")
+#define AUDRNDT_INTERNAL        _T("Internal Audio Renderer")
 
 #define DEFAULT_SUBTITLE_PATHS  _T(".;.\\subtitles;.\\subs")
 #define DEFAULT_JUMPDISTANCE_1  1000
@@ -272,36 +276,31 @@ public:
     CStringA rmcmd;
     int rmrepcnt;
 
-    wmcmd(WORD cmd = 0)
-        : appcmd(0)
-        , appcmdorg(0)
-        , dwname(0)
-        , mouse(NONE)
-        , mouseorg(NONE)
-        , mouseFS(NONE)
-        , mouseFSorg(NONE)
-        , rmcmd("")
-        , rmrepcnt(0) {
-        this->cmd = cmd;
-        this->key = 0;
-        this->fVirt = 0;
-        ZeroMemory(&backup, sizeof(backup));
+    explicit wmcmd(WORD cmd = 0)
+        : ACCEL( { 0, 0, cmd })
+    , backup({ 0, 0, cmd })
+    , appcmdorg(0)
+    , mouseorg(NONE)
+    , mouseFSorg(NONE)
+    , dwname(0)
+    , appcmd(0)
+    , mouse(NONE)
+    , mouseFS(NONE)
+    , rmrepcnt(0) {
     }
 
     wmcmd(WORD cmd, WORD key, BYTE fVirt, DWORD dwname, UINT appcmd = 0, UINT mouse = NONE, UINT mouseFS = NONE, LPCSTR rmcmd = "", int rmrepcnt = 5)
-        : appcmd(appcmd)
-        , appcmdorg(appcmd)
-        , dwname(dwname)
-        , mouse(mouse)
-        , mouseorg(mouse)
-        , mouseFS(mouseFS)
-        , mouseFSorg(mouseFS)
-        , rmcmd(rmcmd)
-        , rmrepcnt(rmrepcnt) {
-        this->cmd = cmd;
-        this->key = key;
-        this->fVirt = fVirt;
-        backup = *this;
+        : ACCEL( { fVirt, key, cmd })
+    , backup({ fVirt, key, cmd })
+    , appcmdorg(appcmd)
+    , mouseorg(mouse)
+    , mouseFSorg(mouseFS)
+    , dwname(dwname)
+    , appcmd(appcmd)
+    , mouse(mouse)
+    , mouseFS(mouseFS)
+    , rmcmd(rmcmd)
+    , rmrepcnt(rmrepcnt) {
     }
 
     bool operator == (const wmcmd& wc) const {
@@ -370,11 +369,11 @@ public:
     CUIceClient();
 };
 
-#define APPSETTINGS_VERSION 5
+#define APPSETTINGS_VERSION 7
 
 class CAppSettings
 {
-    bool fInitialized;
+    bool bInitialized;
 
     class CRecentFileAndURLList : public CRecentFileList
     {
@@ -467,6 +466,7 @@ public:
     int             nCmdlnWebServerPort;
     bool            fWebServerUseCompression;
     bool            fWebServerLocalhostOnly;
+    bool            bWebUIEnablePreview;
     bool            fWebServerPrintDebugInfo;
     CString         strWebRoot, strWebDefIndex;
     CString         strWebServerCGI;
@@ -485,13 +485,11 @@ public:
     bool            fEnableWorkerThreadForOpening;
     bool            fReportFailedPins;
     bool            fAutoloadAudio;
-    bool            fAutoloadSubtitles;
     bool            fBlockVSFilter;
     UINT            nVolumeStep;
     UINT            nSpeedStep;
 
-    enum class AfterPlayback
-    {
+    enum class AfterPlayback {
         DO_NOTHING,
         PLAY_NEXT,
         REWIND,
@@ -518,8 +516,7 @@ public:
     // Fullscreen
     bool            fLaunchfullscreen;
     bool            bHideFullscreenControls;
-    enum class HideFullscreenControlsPolicy
-    {
+    enum class HideFullscreenControlsPolicy {
         SHOW_NEVER,
         SHOW_WHEN_HOVERED,
         SHOW_WHEN_CURSOR_MOVED,
@@ -547,8 +544,8 @@ public:
     bool            fBDAUseOffset;
     int             iBDAOffset;
     bool            fBDAIgnoreEncryptedChannels;
-    UINT            nDVBLastChannel;
-    CAtlList<CDVBChannel> m_DVBChannels;
+    int             nDVBLastChannel;
+    std::vector<CDVBChannel> m_DVBChannels;
     DVB_RebuildFilterGraph nDVBRebuildFilterGraph;
     DVB_StopFilterGraph nDVBStopFilterGraph;
 
@@ -598,7 +595,7 @@ public:
     bool            fShowChapters;
     bool            bNotifySkype;
     bool            fPreventMinimize;
-    bool            fUseWin7TaskBar;
+    bool            bUseEnhancedTaskBar;
     bool            fLCDSupport;
     bool            fUseSearchInFolder;
     bool            fUseTimeTooltip;
@@ -658,6 +655,7 @@ public:
     UINT            nLastWindowType;
     UINT            nLastUsedPage;
     bool            fRemainingTime;
+    bool            bHighPrecisionTimer;
     bool            fLastFullScreen;
 
     bool            fIntRealMedia;
@@ -672,13 +670,32 @@ public:
     bool            bEnableCoverArt;
     int             nCoverArtSizeLimit;
 
+    bool            bEnableLogging;
+
     bool            IsD3DFullscreen() const;
     CString         SelectedAudioRenderer() const;
     bool            IsISRAutoLoadEnabled() const;
-    bool            IsISRAvailable() const;
+    bool            IsInitialized() const;
     static bool     IsVideoRendererAvailable(int iVideoRendererType);
 
     CFileAssoc      fileAssoc;
+
+    CComPtr<SaneAudioRenderer::ISettings> sanear;
+
+    DWORD           iLAVGPUDevice;
+
+    enum class SubtitleRenderer {
+        INTERNAL,
+        VS_FILTER,
+        XY_SUB_FILTER,
+    };
+
+    SubtitleRenderer GetSubtitleRenderer() const;
+    void  SetSubtitleRenderer(SubtitleRenderer renderer) { eSubtitleRenderer = renderer; }
+
+    static bool IsSubtitleRendererRegistered(SubtitleRenderer eSubtitleRenderer);
+
+    static bool IsSubtitleRendererSupported(SubtitleRenderer eSubtitleRenderer, int videoRenderer);
 
 private:
     struct FilterKey {
@@ -713,6 +730,8 @@ private:
     void            UpdateRenderersData(bool fSave);
     friend void     CRenderersSettings::UpdateData(bool bSave);
 
+    SubtitleRenderer eSubtitleRenderer;
+
 public:
     CAppSettings();
     CAppSettings(const CAppSettings&) = delete;
@@ -722,8 +741,10 @@ public:
 
     void            SaveSettings();
     void            LoadSettings();
-    void            SaveExternalFilters() { if (fInitialized) { SaveExternalFilters(m_filters); } };
+    void            SaveExternalFilters() { if (bInitialized) { SaveExternalFilters(m_filters); } };
     void            UpdateSettings();
+
+    void            SetAsUninitialized() { bInitialized = false; };
 
     void            GetFav(favtype ft, CAtlList<CString>& sl) const;
     void            SetFav(favtype ft, CAtlList<CString>& sl);

@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -28,7 +28,7 @@
 #include <fstream>
 #include "USFSubtitles.h"
 
-#include "../DSUtil/WinAPIUtils.h"
+#include "../DSUtil/PathUtils.h"
 
 
 static struct htmlcolor {
@@ -241,14 +241,6 @@ TCHAR* CharSetNames[] = {
 int CharSetLen = _countof(CharSetList);
 
 //
-
-static DWORD CharSetToCodePage(DWORD dwCharSet)
-{
-    CHARSETINFO cs;
-    ZeroMemory(&cs, sizeof(CHARSETINFO));
-    ::TranslateCharsetInfo((DWORD*)dwCharSet, &cs, TCI_SRCCHARSET);
-    return cs.ciACP;
-}
 
 static int FindChar(CStringW str, WCHAR c, int pos, bool fUnicode, int CharSet)
 {
@@ -472,58 +464,67 @@ static CStringW SubRipper2SSA(CStringW str, int CharSet)
 
 static bool OpenSubRipper(CTextFile* file, CSimpleTextSubtitle& ret, int CharSet)
 {
-    CStringW buff;
+    CStringW buff, start, end;
     while (file->ReadString(buff)) {
         FastTrim(buff);
         if (buff.IsEmpty()) {
             continue;
         }
 
-        WCHAR sep;
         int num = 0; // This one isn't really used just assigned a new value
-        int hh1, mm1, ss1, ms1, hh2, mm2, ss2, ms2;
-        WCHAR msStr1[5] = {0}, msStr2[5] = {0};
-        int c = swscanf_s(buff, L"%d%c%d%c%d%4[^-] --> %d%c%d%c%d%4s\n",
-                          &hh1, &sep, 1, &mm1, &sep, 1, &ss1, msStr1, _countof(msStr1),
-                          &hh2, &sep, 1, &mm2, &sep, 1, &ss2, msStr2, _countof(msStr2));
 
-        if (c == 1) { // numbering
-            num = hh1;
-        } else if (c >= 11) { // time info
-            // Parse ms if present
-            if (2 != swscanf_s(msStr1, L"%c%d", &sep, 1, &ms1)) {
-                ms1 = 0;
-            }
-            if (2 != swscanf_s(msStr2, L"%c%d", &sep, 1, &ms2)) {
-                ms2 = 0;
-            }
+        WCHAR wc;
+        int c = swscanf_s(buff, L"%d%c", &num, &wc, 1);
 
-            CStringW str, tmp;
+        if (c == 2) { // c == 1 would be numbering, c == 2 might be timecodes
+            int len = buff.GetLength();
+            c = swscanf_s(buff, L"%s --> %s", start.GetBuffer(len), len, end.GetBuffer(len), len);
+            start.ReleaseBuffer();
+            end.ReleaseBuffer();
 
-            bool fFoundEmpty = false;
+            auto readTimeCode = [](LPCWSTR str, int& hh, int& mm, int& ss, int& ms) {
+                WCHAR sep;
+                int c = swscanf_s(str, L"%d%c%d%c%d%c%d",
+                                  &hh, &sep, 1, &mm, &sep, 1, &ss, &sep, 1, &ms);
+                // Check if ms was present
+                if (c == 5) {
+                    ms = 0;
+                }
+                return (c == 5 || c == 7);
+            };
 
-            while (file->ReadString(tmp)) {
-                FastTrim(tmp);
-                if (tmp.IsEmpty()) {
-                    fFoundEmpty = true;
+            int hh1, mm1, ss1, ms1, hh2, mm2, ss2, ms2;
+
+            if (c == 2
+                    && readTimeCode(start, hh1, mm1, ss1, ms1)
+                    && readTimeCode(end, hh2, mm2, ss2, ms2)) {
+                CStringW str, tmp;
+
+                bool bFoundEmpty = false;
+
+                while (file->ReadString(tmp)) {
+                    FastTrim(tmp);
+                    if (tmp.IsEmpty()) {
+                        bFoundEmpty = true;
+                    }
+
+                    int num2;
+                    if (swscanf_s(tmp, L"%d%c", &num2, &wc, 1) == 1 && bFoundEmpty) {
+                        num = num2;
+                        break;
+                    }
+
+                    str += tmp + '\n';
                 }
 
-                int num2;
-                WCHAR wc;
-                if (swscanf_s(tmp, L"%d%c", &num2, &wc, 1) == 1 && fFoundEmpty) {
-                    num = num2;
-                    break;
-                }
-
-                str += tmp + '\n';
+                ret.Add(SubRipper2SSA(str, CharSet),
+                        file->IsUnicode(),
+                        (((hh1 * 60 + mm1) * 60) + ss1) * 1000 + ms1,
+                        (((hh2 * 60 + mm2) * 60) + ss2) * 1000 + ms2);
+            } else {
+                return false;
             }
-
-            ret.Add(
-                SubRipper2SSA(str, CharSet),
-                file->IsUnicode(),
-                (((hh1 * 60 + mm1) * 60) + ss1) * 1000 + ms1,
-                (((hh2 * 60 + mm2) * 60) + ss2) * 1000 + ms2);
-        } else if (c != EOF) { // might be another format
+        } else if (c != 1) { // might be another format
             return false;
         }
     }
@@ -627,8 +628,8 @@ static bool OpenSubViewer(CTextFile* file, CSimpleTextSubtitle& ret, int CharSet
         WCHAR sep;
         int hh1, mm1, ss1, hs1, hh2, mm2, ss2, hs2;
         int c = swscanf_s(buff, L"%d:%d:%d%c%d,%d:%d:%d%c%d\n",
-                          &hh1, &mm1, &ss1, &sep, sizeof(WCHAR),
-                          &hs1, &hh2, &mm2, &ss2, &sep, sizeof(WCHAR), &hs2);
+                          &hh1, &mm1, &ss1, &sep, 1,
+                          &hs1, &hh2, &mm2, &ss2, &sep, 1, &hs2);
 
         if (c == 10) {
             CStringW str;
@@ -1269,7 +1270,7 @@ static bool LoadFont(const CString& font)
     const TCHAR* s = font;
     const TCHAR* e = s + len;
     for (BYTE* p = pData; s < e; s++, p++) {
-        *p = *s - 33;
+        *p = BYTE(*s - 33);
     }
 
     for (ptrdiff_t i = 0, j = 0, k = len & ~3; i < k; i += 4, j += 3) {
@@ -1311,7 +1312,7 @@ static bool LoadFont(const CString& font)
         CString fn;
         fn.Format(_T("%sfont%08lx.ttf"), path, chksum);
 
-        if (!FileExists(fn)) {
+        if (!PathUtils::Exists(fn)) {
             CFile f;
             if (f.Open(fn, CFile::modeCreate | CFile::modeWrite | CFile::typeBinary | CFile::shareDenyNone)) {
                 f.Write(pData, datalen);
@@ -1485,7 +1486,7 @@ static bool OpenSubStationAlpha(CTextFile* file, CSimpleTextSubtitle& ret, int C
                     style->colors[2] = style->colors[3];    // style->colors[2] is used for drawing the outline
                     alpha = std::max(std::min(alpha, 0xff), 0);
                     for (size_t i = 0; i < 3; i++) {
-                        style->alpha[i] = alpha;
+                        style->alpha[i] = (BYTE)alpha;
                     }
                     style->alpha[3] = 0x80;
                 }
@@ -1580,6 +1581,8 @@ static bool OpenSubStationAlpha(CTextFile* file, CSimpleTextSubtitle& ret, int C
             fRet = true;
         } else if (entry == L"fontname") {
             LoadUUEFont(file);
+        } else if (entry == L"ycbcr matrix") {
+            ret.m_sYCbCrMatrix = GetStrW(pszBuff, nBuffLength);
         }
     }
 
@@ -1645,7 +1648,7 @@ static bool OpenXombieSub(CTextFile* file, CSimpleTextSubtitle& ret, int CharSet
                     style->colors[i] = (COLORREF)GetInt(pszBuff, nBuffLength);
                 }
                 for (size_t i = 0; i < 4; i++) {
-                    style->alpha[i] = GetInt(pszBuff, nBuffLength);
+                    style->alpha[i] = (BYTE)GetInt(pszBuff, nBuffLength);
                 }
                 style->fontWeight = GetInt(pszBuff, nBuffLength) ? FW_BOLD : FW_NORMAL;
                 style->fItalic = GetInt(pszBuff, nBuffLength);
@@ -1810,17 +1813,17 @@ static int nOpenFuncts = _countof(OpenFuncts);
 //
 
 CSimpleTextSubtitle::CSimpleTextSubtitle()
-    : m_mode(TIME)
+    : m_lcid(0)
+    , m_subtitleType(Subtitle::SRT)
+    , m_mode(TIME)
+    , m_encoding(CTextFile::DEFAULT_ENCODING)
     , m_dstScreenSize(CSize(0, 0))
     , m_defaultWrapStyle(0)
     , m_collisions(0)
     , m_fScaledBAS(false)
-    , m_encoding(CTextFile::DEFAULT_ENCODING)
-    , m_lcid(0)
+    , m_fUsingAutoGeneratedDefaultStyle(false)
     , m_ePARCompensationType(EPCTDisabled)
     , m_dPARCompensation(1.0)
-    , m_subtitleType(Subtitle::SRT)
-    , m_fUsingAutoGeneratedDefaultStyle(false)
 {
 }
 
@@ -2429,7 +2432,7 @@ bool CSimpleTextSubtitle::GetStyle(CString styleName, STSStyle& stss)
 int CSimpleTextSubtitle::GetCharSet(int i)
 {
     const STSStyle* stss = GetStyle(i);
-    return stss->charSet;
+    return stss ? stss->charSet : DEFAULT_CHARSET;
 }
 
 bool CSimpleTextSubtitle::IsEntryUnicode(int i)
@@ -2615,7 +2618,7 @@ bool CSimpleTextSubtitle::Open(CString fn, int CharSet, CString name, CString vi
     return Open(&f, CharSet, name);
 }
 
-static size_t CountLines(CTextFile* f, ULONGLONG from, ULONGLONG to, CString& s = CString())
+static size_t CountLines(CTextFile* f, ULONGLONG from, ULONGLONG to, CString s = _T(""))
 {
     size_t n = 0;
     f->Seek(from, CFile::begin);
@@ -2759,17 +2762,15 @@ bool CSimpleTextSubtitle::SaveAs(CString fn, Subtitle::SubType type,
         if (type == Subtitle::ASS && m_fScaledBAS) {
             str += _T("ScaledBorderAndShadow: Yes\n");
         }
-        str += _T("PlayResX: %d\n");
-        str += _T("PlayResY: %d\n");
+        str.AppendFormat(_T("PlayResX: %d\n"), m_dstScreenSize.cx);
+        str.AppendFormat(_T("PlayResY: %d\n"), m_dstScreenSize.cy);
         str += _T("Timer: 100.0000\n");
         str += _T("\n");
         str += (type == Subtitle::SSA)
                ? _T("[V4 Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, TertiaryColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, AlphaLevel, Encoding\n")
                : _T("[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n");
 
-        CString str2;
-        str2.Format(str, m_dstScreenSize.cx, m_dstScreenSize.cy);
-        f.WriteString(str2);
+        f.WriteString(str);
 
         str  = (type == Subtitle::SSA)
                ? _T("Style: %s,%s,%d,&H%06x,&H%06x,&H%06x,&H%06x,%d,%d,%d,%.2f,%.2f,%d,%d,%d,%d,%d,%d\n")
@@ -3036,9 +3037,9 @@ STSStyle& STSStyle::operator = (LOGFONT& lf)
     return *this;
 }
 
-LOGFONTA& operator <<= (LOGFONTA& lfa, STSStyle& s)
+LOGFONTA& operator <<= (LOGFONTA& lfa, const STSStyle& s)
 {
-    lfa.lfCharSet = s.charSet;
+    lfa.lfCharSet = (BYTE)s.charSet;
     strncpy_s(lfa.lfFaceName, LF_FACESIZE, CStringA(s.fontName), _TRUNCATE);
     HDC hDC = GetDC(nullptr);
     lfa.lfHeight = -MulDiv((int)(s.fontSize + 0.5), GetDeviceCaps(hDC, LOGPIXELSY), 72);
@@ -3050,9 +3051,9 @@ LOGFONTA& operator <<= (LOGFONTA& lfa, STSStyle& s)
     return lfa;
 }
 
-LOGFONTW& operator <<= (LOGFONTW& lfw, STSStyle& s)
+LOGFONTW& operator <<= (LOGFONTW& lfw, const STSStyle& s)
 {
-    lfw.lfCharSet = s.charSet;
+    lfw.lfCharSet = (BYTE)s.charSet;
     wcsncpy_s(lfw.lfFaceName, LF_FACESIZE, CStringW(s.fontName), _TRUNCATE);
     HDC hDC = GetDC(nullptr);
     lfw.lfHeight = -MulDiv((int)(s.fontSize + 0.5), GetDeviceCaps(hDC, LOGPIXELSY), 72);
@@ -3106,7 +3107,7 @@ STSStyle& operator <<= (STSStyle& s, const CString& style)
                 s.colors[i] = (COLORREF)GetInt(pszBuff, nBuffLength, L';');
             }
             for (size_t i = 0; i < 4; i++) {
-                s.alpha[i] = GetInt(pszBuff, nBuffLength, L';');
+                s.alpha[i] = (BYTE)GetInt(pszBuff, nBuffLength, L';');
             }
             s.charSet = GetInt(pszBuff, nBuffLength, L';');
             s.fontName = WToT(GetStrW(pszBuff, nBuffLength, L';'));
@@ -3143,7 +3144,12 @@ static bool OpenRealText(CTextFile* file, CSimpleTextSubtitle& ret, int CharSet)
             continue;
         }
 
-        szFile += CStringW(_T("\n")) + buff.GetBuffer();
+        // Make sure that the subtitle file starts with a <window> tag
+        if (szFile.empty() && buff.CompareNoCase(_T("<window")) < 0) {
+            return false;
+        }
+
+        szFile += _T("\n") + buff;
     }
 
     CRealTextParser RealTextParser;

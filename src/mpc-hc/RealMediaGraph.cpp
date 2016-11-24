@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -42,16 +42,16 @@ CRealMediaPlayer::CRealMediaPlayer(HWND hWndParent, CRealMediaGraph* pRMG)
     : CUnknown(NAME("CRealMediaPlayer"), nullptr)
     , m_pRMG(pRMG)
     , m_hWndParent(hWndParent)
+    , m_VideoSize(0, 0)
+    , m_fVideoSizeChanged(true)
     , m_fpCreateEngine(nullptr)
     , m_fpCloseEngine(nullptr)
+    , m_fpSetDLLAccessPath(nullptr)
     , m_hRealMediaCore(nullptr)
     , m_State(State_Stopped)
     , m_UserState(State_Stopped)
     , m_nCurrent(0)
     , m_nDuration(0)
-    , m_VideoSize(0, 0)
-    , m_fVideoSizeChanged(true)
-    , m_fpSetDLLAccessPath(nullptr)
     , m_unPercentComplete(0)
 {
 }
@@ -829,7 +829,7 @@ STDMETHODIMP CRealMediaGraph::put_Volume(long lVolume)
     }
 
     UINT16 volume = (lVolume <= -10000) ? 0 : UINT16(pow(10.0, lVolume / 4000.0) * 100);
-    volume = max<UINT16>(min<UINT16>(volume, 100u), 0u);
+    volume = std::max<UINT16>(std::min<UINT16>(volume, 100u), 0u);
 
     return PNR_OK == m_pRMP->m_pVolume->SetVolume(volume) ? S_OK : E_FAIL;
 }
@@ -844,7 +844,7 @@ STDMETHODIMP CRealMediaGraph::get_Volume(long* plVolume)
 
     *plVolume = (long)m_pRMP->m_pVolume->GetVolume(); // [?..100]
     if (*plVolume > 0) {
-        *plVolume = min(long(4000 * log10(*plVolume / 100.0f)), 0l);
+        *plVolume = std::min(long(4000 * log10(*plVolume / 100.0f)), 0l);
     } else {
         *plVolume = -10000;
     }

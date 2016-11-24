@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2014 see Authors.txt
+ * (C) 2006-2015 see Authors.txt
  *
  * This file is part of MPC-HC.
  *
@@ -59,7 +59,7 @@ enum RelativeTo {
 // ISubPic
 //
 
-interface __declspec(uuid("449E11F3-52D1-4a27-AA61-E2733AC92CC0"))
+interface __declspec(uuid("DA3A5B51-958C-4C28-BF66-68D7947577A2"))
 ISubPic :
 public IUnknown {
     static const REFERENCE_TIME INVALID_TIME = -1;
@@ -85,7 +85,9 @@ public IUnknown {
     STDMETHOD(Unlock)(RECT* pDirtyRect /*[in]*/) PURE;
 
     STDMETHOD(AlphaBlt)(RECT * pSrc, RECT * pDst, SubPicDesc* pTarget = nullptr /*[in]*/) PURE;
-    STDMETHOD(GetSourceAndDest)(RECT rcWindow /*[in]*/, RECT rcVideo /*[in]*/, RECT* pRcSource /*[out]*/, RECT* pRcDest /*[out]*/) const PURE;
+    STDMETHOD(GetSourceAndDest)(RECT rcWindow /*[in]*/, RECT rcVideo /*[in]*/,
+                                RECT* pRcSource /*[out]*/,  RECT* pRcDest /*[out]*/,
+                                const double videoStretchFactor = 1.0 /*[in]*/) const PURE;
     STDMETHOD(SetVirtualTextureSize)(const SIZE pSize, const POINT pTopLeft) PURE;
     STDMETHOD(GetRelativeTo)(RelativeTo* pRelativeTo /*[out]*/) const PURE;
     STDMETHOD(SetRelativeTo)(RelativeTo relativeTo /*[in]*/) PURE;
@@ -219,6 +221,7 @@ public IPersist {
     STDMETHOD_(int, GetStream)() PURE;
     STDMETHOD(SetStream)(int iStream) PURE;
     STDMETHOD(Reload)() PURE;
+    STDMETHOD(SetSourceTargetInfo)(CString yuvMatrix, int targetBlackLevel, int targetWhiteLevel) PURE;
 
     // TODO: get rid of IPersist to identify type and use only
     // interface functions to modify the settings of the substream
